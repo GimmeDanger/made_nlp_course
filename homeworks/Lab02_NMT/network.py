@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 
 import torchtext
-from torchtext.datasets import TranslationDataset, Multi30k
-from torchtext.data import Field, BucketIterator
+from torchtext.legacy.datasets import TranslationDataset, Multi30k
+from torchtext.legacy.data import Field, BucketIterator
 
 import random
 import math
@@ -12,30 +12,29 @@ import time
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout):
+    def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout, emb_weights=None):
         super().__init__()
         
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.hid_dim = hid_dim
         self.n_layers = n_layers
-#         self.dropout = dropout
+        self.dropout = dropout
+        self.emb_weights = emb_weights
         
         self.embedding = nn.Embedding(
             num_embeddings=input_dim,
             embedding_dim=emb_dim
         )
-            # <YOUR CODE HERE>
-        
+
         self.rnn = nn.LSTM(
             input_size=emb_dim,
             hidden_size=hid_dim,
             num_layers=n_layers,
             dropout=dropout
         )
-            # <YOUR CODE HERE>
-        
-        self.dropout = nn.Dropout(p=dropout)# <YOUR CODE HERE>
+
+        self.dropout = nn.Dropout(p=dropout)
         
     def forward(self, src):
         
@@ -64,7 +63,7 @@ class Encoder(nn.Module):
     
 
 class Decoder(nn.Module):
-    def __init__(self, output_dim, emb_dim, hid_dim, n_layers, dropout):
+    def __init__(self, output_dim, emb_dim, hid_dim, n_layers, dropout, emb_weights=None):
         super().__init__()
 
         self.emb_dim = emb_dim
@@ -72,28 +71,26 @@ class Decoder(nn.Module):
         self.output_dim = output_dim
         self.n_layers = n_layers
         self.dropout = dropout
+        self.emb_weights = emb_weights
         
         self.embedding = nn.Embedding(
             num_embeddings=output_dim,
             embedding_dim=emb_dim
         )
-            # <YOUR CODE HERE>
-        
+
         self.rnn = nn.LSTM(
             input_size=emb_dim,
             hidden_size=hid_dim,
             num_layers=n_layers,
             dropout=dropout
         )
-            # <YOUR CODE HERE>
-        
+
         self.out = nn.Linear(
             in_features=hid_dim,
             out_features=output_dim
         )
-            # <YOUR CODE HERE>
-        
-        self.dropout = nn.Dropout(p=dropout)# <YOUR CODE HERE>
+
+        self.dropout = nn.Dropout(p=dropout)
         
     def forward(self, input, hidden, cell):
         
@@ -138,12 +135,13 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder, device):
+    def __init__(self, encoder, decoder, device, name):
         super().__init__()
         
         self.encoder = encoder
         self.decoder = decoder
         self.device = device
+        self.name = name
         
         assert encoder.hid_dim == decoder.hid_dim, \
             "Hidden dimensions of encoder and decoder must be equal!"
@@ -180,3 +178,21 @@ class Seq2Seq(nn.Module):
             input = (trg[t] if teacher_force else top1)
         
         return outputs
+
+
+def init_weights(m):
+    for name, param in m.named_parameters():
+        if name == 'encoder.embedding.weight' and m.encoder.emb_weights is not None:
+            print('Set pretrained weights for', name)
+            param.data.copy_(m.encoder.emb_weights)
+            print(param)
+        elif name == 'decoder.embedding.weight' and m.decoder.emb_weights is not None:
+            print('Set pretrained weights for', name)
+            param.data.copy_(m.decoder.emb_weights)
+            print(param)
+        else:
+            nn.init.uniform_(param, -0.08, 0.08)
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
