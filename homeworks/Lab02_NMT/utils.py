@@ -86,7 +86,7 @@ def tokenize(x, tokenizer=WordPunctTokenizer()):
     return tokenizer.tokenize(x.lower())
 
 
-def prepare_data(path_to_data, verbose=True):
+def prepare_data(path_to_data, path_to_src_emb, verbose=True):
     # initialize fields
     SRC = Field(tokenize=tokenize,
                 init_token = '<sos>',
@@ -106,16 +106,11 @@ def prepare_data(path_to_data, verbose=True):
     )
     train_data, valid_data, test_data = dataset.split(split_ratio=[0.8, 0.15, 0.05])
 
-    # load emb vectors: ru emb -- from deeppavlov.ai
+    # load emb vectors: ru emb -- from DeepPavlov
     #                   en emb -- from torch pre
     cache = '.vector_cache'
     if not os.path.exists(cache):
         os.mkdir(cache)
-    path_to_src_emb = '/content/ft_native_300_ru_wiki_lenta_lower_case.vec'
-    if not os.path.exists(path_to_src_emb):
-        print("enc emb weights not found locally. Downloading from deeppavlov.ai.")
-        url = 'http://files.deeppavlov.ai/embeddings/ft_native_300_ru_wiki_lenta_lower_case/ft_native_300_ru_wiki_lenta_lower_case.vec'
-        wget.download(url)
     enc_vectors = Vectors(name=path_to_src_emb, cache=cache)
     dec_vectors = 'fasttext.simple.300d'
 
@@ -131,3 +126,10 @@ def prepare_data(path_to_data, verbose=True):
         print(f"Unique tokens in target (en) vocabulary: {len(TRG.vocab)}")
 
     return train_data, valid_data, test_data, SRC, TRG
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
+
+
