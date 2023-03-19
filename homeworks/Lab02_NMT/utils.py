@@ -1,6 +1,4 @@
-import tqdm
 import torch
-import wget
 import os
 
 from torchtext.legacy.data import Field, BucketIterator, TabularDataset
@@ -54,7 +52,7 @@ def corpus_blue_accuracy(model, trg_vocab, test_iterator):
     generated_text = []
     model.eval()
     with torch.no_grad():
-        for i, batch in tqdm.tqdm(enumerate(test_iterator)):
+        for i, batch in enumerate(test_iterator):
             src = batch.src
             trg = batch.trg
 
@@ -86,7 +84,7 @@ def tokenize(x, tokenizer=WordPunctTokenizer()):
     return tokenizer.tokenize(x.lower())
 
 
-def prepare_data(path_to_data, path_to_src_emb, verbose=True):
+def prepare_data(path_to_data, path_to_src_emb=None, verbose=True):
     # initialize fields
     SRC = Field(tokenize=tokenize,
                 init_token = '<sos>',
@@ -106,17 +104,21 @@ def prepare_data(path_to_data, path_to_src_emb, verbose=True):
     )
     train_data, valid_data, test_data = dataset.split(split_ratio=[0.8, 0.15, 0.05])
 
-    # load emb vectors: ru emb -- from DeepPavlov
-    #                   en emb -- from torch pre
-    cache = '.vector_cache'
-    if not os.path.exists(cache):
-        os.mkdir(cache)
-    enc_vectors = Vectors(name=path_to_src_emb, cache=cache)
-    dec_vectors = 'fasttext.simple.300d'
+    if path_to_src_emb is not None:
+        # load emb vectors: ru emb -- from DeepPavlov
+        #                   en emb -- from torch pre
+        cache = '.vector_cache'
+        if not os.path.exists(cache):
+            os.mkdir(cache)
+        enc_vectors = Vectors(name=path_to_src_emb, cache=cache)
+        dec_vectors = 'fasttext.simple.300d'
 
-    # init vocabs with emb vectors
-    SRC.build_vocab(train_data, min_freq = 3, vectors=enc_vectors)
-    TRG.build_vocab(train_data, min_freq = 3, vectors=dec_vectors)
+        # init vocabs with emb vectors
+        SRC.build_vocab(train_data, min_freq = 3, vectors=enc_vectors)
+        TRG.build_vocab(train_data, min_freq = 3, vectors=dec_vectors)
+    else:
+        SRC.build_vocab(train_data, min_freq = 3)
+        TRG.build_vocab(train_data, min_freq = 3)
 
     if verbose:
         print(f"\nNumber of training examples: {len(train_data.examples)}")
@@ -131,5 +133,3 @@ def prepare_data(path_to_data, path_to_src_emb, verbose=True):
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
-
-
